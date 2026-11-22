@@ -1,3 +1,5 @@
+# Story 1: static ingestion. Variable names match .env.example and docker-compose.yml.
+# Port 8080 in Docker (SERVER_PORT), 8081 when run locally.
 server:
   port: 8081
 
@@ -7,20 +9,23 @@ spring:
   application:
     name: ingest-static
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:ragdb}
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ragdb}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
   ai:
     openai:
-      api-key: ${OPENAI_API_KEY}
+      api-key: ${LLM_API_KEY}
+      # Spring AI 2 uses the official OpenAI SDK: the base URL must include /v1 (otherwise every call is a 404).
+      base-url: ${LLM_BASE_URL:https://api.openai.com/v1}
       embedding:
         options:
-          model: ${OPENAI_EMBEDDING_MODEL:text-embedding-3-small}
+          model: ${EMBEDDING_MODEL:text-embedding-3-small}
     vectorstore:
       pgvector:
         index-type: HNSW
         distance-type: COSINE_DISTANCE
         dimensions: ${EMBEDDING_DIMENSIONS:1536}
+        # ingest-static is the only service that creates the vector_store table.
         initialize-schema: true
         remove-existing-vector-store-table: false
 
@@ -29,11 +34,14 @@ app:
     resources-dir: ${INGEST_RESOURCES_DIR:./resources}
     chunk-size: ${CHUNK_SIZE:800}
     chunk-overlap: ${CHUNK_OVERLAP:100}
+    # Follows the model Spring AI actually uses, so the metadata and the ingestion fingerprint
+    # change whenever the model changes, which triggers a re-index.
+    embedding-model: ${spring.ai.openai.embedding.options.model:text-embedding-3-small}
 
 eureka:
   client:
     service-url:
-      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true
 

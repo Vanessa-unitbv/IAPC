@@ -21,7 +21,8 @@ public class IngestProperties {
 
     /**
      * Name of the embedding model, stored in metadata and in the ingestion fingerprint.
-     * Must match the model configured in Spring AI (e.g. spring.ai.openai.embedding.options.model).
+     * Bound in application.yaml to {@code spring.ai.openai.embedding.options.model}, so it always matches
+     * the model Spring AI uses. The default below only applies when no configuration file is loaded.
      */
     private String embeddingModel = "text-embedding-3-small";
 

@@ -1,4 +1,4 @@
-package com.edupulse.ingeststatic.chunking;
+package com.edupulse.ragcommon.chunking;
 
 /** Counts tokens; abstracted so the splitter can be unit-tested without a tokenizer. */
 @FunctionalInterface

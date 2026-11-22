@@ -1,0 +1,30 @@
+# Story 3: pre-retrieval (metadata filters, query normalization, expansion)
+# Skeleton: health check and Eureka registration only. Port 8080 in Docker (SERVER_PORT), 8083 when run locally.
+server:
+  port: 8083
+
+spring:
+  config:
+    import: optional:file:.env[.properties],optional:file:../.env[.properties]
+  application:
+    name: retrieval-pre
+
+app:
+  retrieval:
+    top-k: ${RETRIEVAL_TOP_K:20}
+    similarity-threshold: ${SIMILARITY_THRESHOLD:0.70}
+  query-expansion:
+    variants: ${QUERY_EXPANSION_VARIANTS:3}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

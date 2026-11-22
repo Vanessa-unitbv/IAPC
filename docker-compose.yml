@@ -6,9 +6,11 @@
 #   docker compose up --build -d
 #   docker compose ps
 #
-# Expected repo layout (Maven multi-module, module names = folder names):
-#   eureka-server/  api-gateway/  ingest-static/  ingest-dynamic/
-#   retrieval-pre/  retrieval-post/  pom.xml  Dockerfile
+# Every service is reached through the gateway: http://localhost:8080/<service-name>/...
+#   e.g. POST http://localhost:8080/ingest-static/ingest/static/run
+#
+# The services read the same variable names as when they run locally (see .env.example),
+# so the environment blocks below only pass values through and set what differs inside Docker.
 
 name: rag-platform
 
@@ -16,27 +18,30 @@ name: rag-platform
 
 x-base-env: &base-env
   JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75"
-  EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: "http://eureka-server:8761/eureka/"
+  # Every service listens on 8080 inside its container (the healthcheck below relies on it).
+  SERVER_PORT: "8080"
+  EUREKA_URL: "http://eureka-server:8761/eureka/"
   EUREKA_INSTANCE_PREFER_IP_ADDRESS: "true"
 
 # Env shared by every service that talks to pgvector and the LLM/embedding API.
-# Only ingest-static creates the vector_store table (see PGVECTOR_INITIALIZE_SCHEMA),
-# so the four services never race to create it at startup.
 x-rag-env: &rag-env
   <<: *base-env
-  SPRING_DATASOURCE_URL: "jdbc:postgresql://pgvector:5432/${POSTGRES_DB}"
-  SPRING_DATASOURCE_USERNAME: "${POSTGRES_USER}"
-  SPRING_DATASOURCE_PASSWORD: "${POSTGRES_PASSWORD}"
-  SPRING_AI_VECTORSTORE_PGVECTOR_INITIALIZE_SCHEMA: "false"
-  SPRING_AI_VECTORSTORE_PGVECTOR_INDEX_TYPE: "HNSW"
-  SPRING_AI_VECTORSTORE_PGVECTOR_DISTANCE_TYPE: "COSINE_DISTANCE"
+  POSTGRES_HOST: "pgvector"
+  # Port inside the Docker network; POSTGRES_PORT in .env is only the port published on localhost.
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "${POSTGRES_DB}"
+  POSTGRES_USER: "${POSTGRES_USER}"
+  POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+  # Any OpenAI-compatible API.
+  LLM_API_KEY: "${LLM_API_KEY:?Set LLM_API_KEY in .env}"
+  # Must include /v1 for OpenAI (official SDK); otherwise every LLM/embedding call is a 404.
+  LLM_BASE_URL: "${LLM_BASE_URL:-https://api.openai.com/v1}"
+  CHAT_MODEL: "${CHAT_MODEL:-gpt-4o-mini}"
   # Must match the embedding model's output size. Changing the model means re-indexing.
-  SPRING_AI_VECTORSTORE_PGVECTOR_DIMENSIONS: "${EMBEDDING_DIMENSIONS:-1536}"
-  # Default provider: any OpenAI-compatible API. Swap for another Spring AI starter if needed.
-  SPRING_AI_OPENAI_API_KEY: "${LLM_API_KEY:?Set LLM_API_KEY in .env}"
-  SPRING_AI_OPENAI_BASE_URL: "${LLM_BASE_URL:-https://api.openai.com}"
-  SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: "${CHAT_MODEL:-gpt-4o-mini}"
-  SPRING_AI_OPENAI_EMBEDDING_OPTIONS_MODEL: "${EMBEDDING_MODEL:-text-embedding-3-small}"
+  EMBEDDING_MODEL: "${EMBEDDING_MODEL:-text-embedding-3-small}"
+  EMBEDDING_DIMENSIONS: "${EMBEDDING_DIMENSIONS:-1536}"
+  # Only ingest-static creates the vector_store table, so the services never race to create it at startup.
+  SPRING_AI_VECTORSTORE_PGVECTOR_INITIALIZE_SCHEMA: "false"
 
 x-healthcheck: &healthcheck
   test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP"]
@@ -70,7 +75,7 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./init-db:/docker-entrypoint-initdb.d:ro
     ports:
-      # Bound to localhost only, for DBeaver/psql during development.
+      # Bound to localhost only, for DBeaver/psql and for services run from the IDE.
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
@@ -90,8 +95,6 @@ services:
     environment:
       <<: *base-env
       SERVER_PORT: "8761"
-      EUREKA_CLIENT_REGISTER_WITH_EUREKA: "false"
-      EUREKA_CLIENT_FETCH_REGISTRY: "false"
     ports:
       # Dashboard on localhost only.
       - "127.0.0.1:8761:8761"
@@ -110,12 +113,9 @@ services:
     container_name: api-gateway
     environment:
       <<: *base-env
-      # Routes are created from Eureka: /ingest-static/**, /retrieval-pre/**, ...
-      # Spring Cloud 2025.1 (Gateway 5.x) uses the spring.cloud.gateway.server.webflux prefix.
-      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_DISCOVERY_LOCATOR_ENABLED: "true"
-      SPRING_CLOUD_GATEWAY_SERVER_WEBFLUX_DISCOVERY_LOCATOR_LOWER_CASE_SERVICE_ID: "true"
     ports:
-      - "${GATEWAY_PORT:-8080}:8080"
+      # localhost only: the endpoints spend the LLM key, so they must not be reachable from the network.
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:8080"
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -136,9 +136,9 @@ services:
       <<: *rag-env
       # The only service that creates the vector_store table.
       SPRING_AI_VECTORSTORE_PGVECTOR_INITIALIZE_SCHEMA: "true"
-      APP_RESOURCES_PATH: "/data/resources"
-      APP_CHUNK_SIZE: "${CHUNK_SIZE:-800}"
-      APP_CHUNK_OVERLAP: "${CHUNK_OVERLAP:-100}"
+      INGEST_RESOURCES_DIR: "/data/resources"
+      CHUNK_SIZE: "${CHUNK_SIZE:-800}"
+      CHUNK_OVERLAP: "${CHUNK_OVERLAP:-100}"
     volumes:
       # External resource folder managed by the user, outside the automation.
       - ./resources:/data/resources:ro
@@ -160,13 +160,14 @@ services:
     container_name: ingest-dynamic
     environment:
       <<: *rag-env
-      APP_RESOURCES_PATH: "/data/resources"
+      INGEST_RESOURCES_DIR: "/data/resources"
       # Verified with HMAC on every vendor webhook.
-      APP_WEBHOOK_SECRET: "${VENDOR_WEBHOOK_SECRET:?Set VENDOR_WEBHOOK_SECRET in .env}"
+      VENDOR_WEBHOOK_SECRET: "${VENDOR_WEBHOOK_SECRET:?Set VENDOR_WEBHOOK_SECRET in .env}"
       # Only these domains may be fetched. Private IP ranges must be blocked in code (SSRF).
-      APP_INGEST_ALLOWED_DOMAINS: "${INGEST_ALLOWED_DOMAINS:-}"
-      APP_INGEST_MAX_SIZE_MB: "${INGEST_MAX_SIZE_MB:-20}"
-      APP_INGEST_BLOCK_PRIVATE_NETWORKS: "true"
+      INGEST_ALLOWED_DOMAINS: "${INGEST_ALLOWED_DOMAINS:-}"
+      INGEST_MAX_SIZE_MB: "${INGEST_MAX_SIZE_MB:-20}"
+      CHUNK_SIZE: "${CHUNK_SIZE:-800}"
+      CHUNK_OVERLAP: "${CHUNK_OVERLAP:-100}"
     volumes:
       - ./resources:/data/resources:ro
     depends_on:
@@ -189,9 +190,9 @@ services:
     container_name: retrieval-pre
     environment:
       <<: *rag-env
-      APP_RETRIEVAL_TOP_K: "${RETRIEVAL_TOP_K:-20}"
-      APP_RETRIEVAL_SIMILARITY_THRESHOLD: "${SIMILARITY_THRESHOLD:-0.70}"
-      APP_QUERY_EXPANSION_VARIANTS: "${QUERY_EXPANSION_VARIANTS:-3}"
+      RETRIEVAL_TOP_K: "${RETRIEVAL_TOP_K:-20}"
+      SIMILARITY_THRESHOLD: "${SIMILARITY_THRESHOLD:-0.70}"
+      QUERY_EXPANSION_VARIANTS: "${QUERY_EXPANSION_VARIANTS:-3}"
     depends_on:
       eureka-server:
         condition: service_healthy
@@ -212,8 +213,8 @@ services:
     container_name: retrieval-post
     environment:
       <<: *rag-env
-      APP_RERANK_TOP_K: "${RERANK_TOP_K:-5}"
-      APP_STITCH_TOKEN_BUDGET: "${STITCH_TOKEN_BUDGET:-2000}"
+      RERANK_TOP_K: "${RERANK_TOP_K:-5}"
+      STITCH_TOKEN_BUDGET: "${STITCH_TOKEN_BUDGET:-2000}"
     depends_on:
       eureka-server:
         condition: service_healthy

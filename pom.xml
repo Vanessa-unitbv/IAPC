@@ -18,23 +18,32 @@
     <name>rag-platform</name>
     <description>RAG microservices: Spring Boot, Spring AI, Eureka, Gateway, pgvector</description>
 
+    <!-- Build everything from here: ./mvnw verify (one module: ./mvnw -pl ingest-static -am verify) -->
     <modules>
+        <module>rag-common</module>
         <module>eureka-server</module>
         <module>api-gateway</module>
         <module>ingest-static</module>
-        <!--<module>ingest-dynamic</module>-->
-        <!--<module>retrieval-pre</module>-->
-        <!--<module>retrieval-post</module>-->
+        <module>ingest-dynamic</module>
+        <module>retrieval-pre</module>
+        <module>retrieval-post</module>
     </modules>
 
+    <!-- The only place where versions are set. Modules declare dependencies without versions. -->
     <properties>
         <java.version>21</java.version>
-        <spring-cloud.version>2025.1.2</spring-cloud.version>
-        <spring-ai.version>2.0.0</spring-ai.version>
+        <spring-cloud.version>2025.1.4</spring-cloud.version>
+        <spring-ai.version>2.0.1</spring-ai.version>
+        <rag-common.version>0.0.1-SNAPSHOT</rag-common.version>
     </properties>
 
     <dependencyManagement>
         <dependencies>
+            <dependency>
+                <groupId>com.edupulse</groupId>
+                <artifactId>rag-common</artifactId>
+                <version>${rag-common.version}</version>
+            </dependency>
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
                 <artifactId>spring-cloud-dependencies</artifactId>
@@ -51,11 +60,4 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
-    <dependencies>
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
-        </dependency>
-    </dependencies>
 </project>

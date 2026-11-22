@@ -1,0 +1,33 @@
+# Story 2: dynamic ingestion (Internet sources, versioning, watcher, webhooks)
+# Skeleton: health check and Eureka registration only. Port 8080 in Docker (SERVER_PORT), 8082 when run locally.
+server:
+  port: 8082
+
+spring:
+  config:
+    import: optional:file:.env[.properties],optional:file:../.env[.properties]
+  application:
+    name: ingest-dynamic
+
+app:
+  ingest:
+    resources-dir: ${INGEST_RESOURCES_DIR:./resources}
+    # Task 4 (security): domains that may be fetched, comma-separated. Empty means nothing is allowed.
+    allowed-domains: ${INGEST_ALLOWED_DOMAINS:}
+    max-size-mb: ${INGEST_MAX_SIZE_MB:20}
+  webhook:
+    # Task 3: HMAC secret shared with the vendor. Webhooks must be rejected while it is empty.
+    secret: ${VENDOR_WEBHOOK_SECRET:}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

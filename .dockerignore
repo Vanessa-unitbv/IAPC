@@ -19,3 +19,5 @@ init-db/
 Dockerfile
 .dockerignore
 *.md
+.github/
+docs/

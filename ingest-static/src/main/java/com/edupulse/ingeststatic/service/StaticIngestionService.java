@@ -1,10 +1,11 @@
 package com.edupulse.ingeststatic.service;
 
-import com.edupulse.ingeststatic.chunking.JTokkitTokenCounter;
-import com.edupulse.ingeststatic.chunking.PdfTextExtractor;
-import com.edupulse.ingeststatic.chunking.StructureAwareSplitter;
-import com.edupulse.ingeststatic.chunking.TextCleaner;
 import com.edupulse.ingeststatic.config.IngestProperties;
+import com.edupulse.ragcommon.ChunkMetadata;
+import com.edupulse.ragcommon.chunking.JTokkitTokenCounter;
+import com.edupulse.ragcommon.chunking.PdfTextExtractor;
+import com.edupulse.ragcommon.chunking.StructureAwareSplitter;
+import com.edupulse.ragcommon.chunking.TextCleaner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -119,21 +120,21 @@ public class StaticIngestionService {
                 log.warn("{} chunk {} (page {}) contains replacement characters; check the PDF fonts", docId, i, c.pageStart());
             }
             Map<String, Object> md = new HashMap<>();
-            md.put("doc_id", docId);
-            md.put("version", 1);
-            md.put("source", docId);
-            md.put("source_type", "static");
-            md.put("page", c.pageStart());
-            md.put("page_end", c.pageEnd());
-            md.put("chunk_index", i);
-            md.put("total_chunks", chunks.size());
-            md.put("checksum", checksum);
-            md.put("ingest_fingerprint", fingerprint);
-            md.put("embedding_model", props.getEmbeddingModel());
-            md.put("chunk_size", props.getChunkSize());
-            md.put("chunk_overlap", props.getChunkOverlap());
-            md.put("ingested_at", ingestedAt);
-            md.put("is_latest", true);
+            md.put(ChunkMetadata.DOC_ID, docId);
+            md.put(ChunkMetadata.VERSION, 1);
+            md.put(ChunkMetadata.SOURCE, docId);
+            md.put(ChunkMetadata.SOURCE_TYPE, ChunkMetadata.SOURCE_TYPE_STATIC);
+            md.put(ChunkMetadata.PAGE, c.pageStart());
+            md.put(ChunkMetadata.PAGE_END, c.pageEnd());
+            md.put(ChunkMetadata.CHUNK_INDEX, i);
+            md.put(ChunkMetadata.TOTAL_CHUNKS, chunks.size());
+            md.put(ChunkMetadata.CHECKSUM, checksum);
+            md.put(ChunkMetadata.INGEST_FINGERPRINT, fingerprint);
+            md.put(ChunkMetadata.EMBEDDING_MODEL, props.getEmbeddingModel());
+            md.put(ChunkMetadata.CHUNK_SIZE, props.getChunkSize());
+            md.put(ChunkMetadata.CHUNK_OVERLAP, props.getChunkOverlap());
+            md.put(ChunkMetadata.INGESTED_AT, ingestedAt);
+            md.put(ChunkMetadata.IS_LATEST, true);
             documents.add(new Document(c.text(), md));
         }
 
