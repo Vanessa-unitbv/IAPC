@@ -2,8 +2,11 @@ package com.edupulse.ragcommon.chunking;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TextCleanerTest {
@@ -54,6 +57,14 @@ class TextCleanerTest {
     @Test
     void wideGapsInTableRowsBecomeColumnSeparators() {
         assertEquals("Comision | 0,5% | 10", TextCleaner.clean("Comision   0,5%    10"));
+    }
+
+    @Test
+    void veryLongLineWithManyWideGapsIsCleanedQuickly() {
+        // used to throw StackOverflowError; content from the Internet can contain such lines
+        String line = "x" + "  a".repeat(20_000) + " b";
+        String cleaned = assertTimeoutPreemptively(Duration.ofSeconds(2), () -> TextCleaner.clean(line));
+        assertTrue(cleaned.startsWith("x a a"));
     }
 
     @Test

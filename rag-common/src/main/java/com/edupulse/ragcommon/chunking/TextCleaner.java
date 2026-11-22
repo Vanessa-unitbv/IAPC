@@ -7,7 +7,11 @@ import java.util.regex.Pattern;
  */
 public final class TextCleaner {
 
-    private static final Pattern TABLE_ROW = Pattern.compile("^\\S.*?\\S( {2,}\\S+){1,}$");
+    /**
+     * A line whose last cell is separated by a wide gap (2+ spaces). Written without a repeated group: the previous
+     * form {@code ^\S.*?\S( {2,}\S+){1,}$} matched the same lines but overflowed the stack on long lines.
+     */
+    private static final Pattern TABLE_ROW = Pattern.compile("^\\S.*\\S {2,}\\S+$");
     private static final Pattern WIDE_GAP = Pattern.compile(" {2,}");
     private static final Pattern MANY_BLANK_LINES = Pattern.compile("\\n{3,}");
     /** A ligature that the font encodes as a control character, between two letters (e.g. "O\u0019ce" = "Office"). */

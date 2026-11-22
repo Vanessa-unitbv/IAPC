@@ -28,6 +28,8 @@ public final class ChunkMetadata {
 
     /** Human-readable source shown in citations (file name or URL). */
     public static final String SOURCE = "source";
+    /** Document title when the source has one (e.g. the HTML title of a web page). */
+    public static final String TITLE = "title";
     /** {@code static} (Story 1) or {@code dynamic} (Story 2). */
     public static final String SOURCE_TYPE = "source_type";
     /** Original URL of a document fetched from the Internet (Story 2). */

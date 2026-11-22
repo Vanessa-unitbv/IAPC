@@ -166,6 +166,7 @@ services:
       # Only these domains may be fetched. Private IP ranges must be blocked in code (SSRF).
       INGEST_ALLOWED_DOMAINS: "${INGEST_ALLOWED_DOMAINS:-}"
       INGEST_MAX_SIZE_MB: "${INGEST_MAX_SIZE_MB:-20}"
+      INGEST_TIMEOUT_SECONDS: "${INGEST_TIMEOUT_SECONDS:-20}"
       CHUNK_SIZE: "${CHUNK_SIZE:-800}"
       CHUNK_OVERLAP: "${CHUNK_OVERLAP:-100}"
     volumes:

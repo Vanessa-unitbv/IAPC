@@ -12,11 +12,28 @@
 	<version>0.0.1-SNAPSHOT</version>
 	<description>Story 2: dynamic ingestion (Internet sources, versioning, watcher, webhooks)</description>
 
-	<!-- Skeleton: add the Spring AI / pgvector starters when the story needs them (versions come from the root pom). -->
 	<dependencies>
 		<dependency>
 			<groupId>com.edupulse</groupId>
 			<artifactId>rag-common</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-model-openai</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+		</dependency>
+		<dependency>
+			<!-- jsoup, for HTML boilerplate removal (version managed by the Spring AI BOM) -->
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-jsoup-document-reader</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

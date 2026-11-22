@@ -17,22 +17,34 @@ public class PdfTextExtractor {
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PdfTextExtractor.class);
 
+    /** A PDF file on disk (Story 1). */
     public List<StructureAwareSplitter.PageText> extract(Path pdf) throws IOException {
-        List<StructureAwareSplitter.PageText> pages = new ArrayList<>();
         try (PDDocument doc = Loader.loadPDF(pdf.toFile())) {
-            int total = doc.getNumberOfPages();
-            for (int page = 1; page <= total; page++) {
-                PDFTextStripper stripper = new PDFTextStripper();
-                stripper.setSortByPosition(true);
-                stripper.setStartPage(page);
-                stripper.setEndPage(page);
-                String text = TextCleaner.clean(stripper.getText(doc));
-                pages.add(new StructureAwareSplitter.PageText(page, text));
-            }
+            return extract(doc, pdf.getFileName().toString());
+        }
+    }
+
+    /** A PDF already in memory, e.g. downloaded from a URL (Story 2). {@code name} is only used in log messages. */
+    public List<StructureAwareSplitter.PageText> extract(byte[] pdf, String name) throws IOException {
+        try (PDDocument doc = Loader.loadPDF(pdf)) {
+            return extract(doc, name);
+        }
+    }
+
+    private List<StructureAwareSplitter.PageText> extract(PDDocument doc, String name) throws IOException {
+        List<StructureAwareSplitter.PageText> pages = new ArrayList<>();
+        int total = doc.getNumberOfPages();
+        for (int page = 1; page <= total; page++) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            stripper.setSortByPosition(true);
+            stripper.setStartPage(page);
+            stripper.setEndPage(page);
+            String text = TextCleaner.clean(stripper.getText(doc));
+            pages.add(new StructureAwareSplitter.PageText(page, text));
         }
         PageNoiseFilter.Result filtered = PageNoiseFilter.apply(pages);
         if (filtered.removedLines() > 0) {
-            log.info("{}: removed {} repeated header/footer/page-number lines", pdf.getFileName(), filtered.removedLines());
+            log.info("{}: removed {} repeated header/footer/page-number lines", name, filtered.removedLines());
         }
         return filtered.pages();
     }
