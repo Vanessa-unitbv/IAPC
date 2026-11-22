@@ -7,15 +7,8 @@ import java.util.regex.Pattern;
  */
 public final class TextCleaner {
 
-    /**
-     * A line whose last cell is separated by a wide gap (2+ spaces). Written without a repeated group: the previous
-     * form {@code ^\S.*?\S( {2,}\S+){1,}$} matched the same lines but overflowed the stack on long lines.
-     */
-    private static final Pattern TABLE_ROW = Pattern.compile("^\\S.*\\S {2,}\\S+$");
-    private static final Pattern WIDE_GAP = Pattern.compile(" {2,}");
     private static final Pattern MANY_BLANK_LINES = Pattern.compile("\\n{3,}");
-    /** A ligature that the font encodes as a control character, between two letters (e.g. "O\u0019ce" = "Office"). */
-    private static final Pattern CONTROL_LIGATURE = Pattern.compile("(?<=\\p{L})\\u0019(?=\\p{L})");
+    private static final Pattern CONCATENATED_HEADING = Pattern.compile("(\\p{Lu}{2,})(?=\\p{Lu}\\p{Ll})");
     private static final Pattern CONTROL_CHARS = Pattern.compile("[\\p{Cc}&&[^\\n\\t]]");
     /** UTF-8 text decoded as Latin-1 shows up as pairs like "Ã¢", "â\u0080\u0099", "È\u009B". */
     private static final Pattern MOJIBAKE = Pattern.compile("[\\u00C2\\u00C3\\u00C4\\u00C5\\u00C8\\u00E2][\\u0080-\\u00BF]");
@@ -39,23 +32,18 @@ public final class TextCleaner {
                 .replace('ş', 'ș').replace('Ş', 'Ș')
                 .replace('ţ', 'ț').replace('Ţ', 'Ț');
 
-        // Heuristic: observed in bt_individual_fees_2022.pdf, where U+0019 stands for "ffi" ("Office").
-        t = CONTROL_LIGATURE.matcher(t).replaceAll("ffi");
         // any other control character (NUL, C1 controls, ...) is noise
         t = CONTROL_CHARS.matcher(t).replaceAll("");
 
         t = joinHyphenatedLines(t);
+        t = CONCATENATED_HEADING.matcher(t).replaceAll("$1 ");
 
         StringBuilder sb = new StringBuilder(t.length());
         for (String line : t.split("\n", -1)) {
-            String stripped = line.stripTrailing();
-            if (TABLE_ROW.matcher(stripped).matches()) {
-                // looks like a table row (3+ cells separated by wide gaps): keep the columns visible
-                stripped = WIDE_GAP.matcher(stripped.strip()).replaceAll(" | ");
-            } else {
-                stripped = stripped.replaceAll("[ \\t]+", " ");
-            }
-            sb.append(stripped).append('\n');
+            // collapse runs of spaces/tabs. Wide gaps are NOT turned into " | ": a gap alone does not prove
+            // a table, and the guess produced stray pipes inside ordinary text and table rows.
+            String normalized = line.replaceAll("[ \\t]+", " ").stripTrailing();
+            sb.append(normalized).append('\n');
         }
         return MANY_BLANK_LINES.matcher(sb).replaceAll("\n\n").strip();
     }

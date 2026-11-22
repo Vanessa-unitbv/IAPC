@@ -28,7 +28,8 @@ public final class PageNoiseFilter {
     private static final int MIN_PAGES = 3;
     private static final double MIN_SHARE = 0.6;
     private static final Pattern PAGE_NUMBER =
-            Pattern.compile("^(page\\s+)?\\d{1,4}(\\s*(/|of)\\s*\\d{1,4})?$", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("^[\\s\\-–—]*(page\\s+)?\\d{1,4}(\\s*(/|of)\\s*\\d{1,4})?[\\s\\-–—]*$",
+                    Pattern.CASE_INSENSITIVE);
 
     private PageNoiseFilter() {
     }

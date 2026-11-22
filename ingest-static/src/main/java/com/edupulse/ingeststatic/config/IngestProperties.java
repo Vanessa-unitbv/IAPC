@@ -27,7 +27,13 @@ public class IngestProperties {
     private String embeddingModel = "text-embedding-3-small";
 
     /** Bump when the extraction/splitting logic changes, to force re-ingestion of existing files. */
-    private int pipelineVersion = 3;
+    private int pipelineVersion = 4;
+
+    /**
+     * PDFBox text sorting by position. Compare true/false on the table PDF and the multi-column PDF and keep
+     * the better one. It changes the extracted text, so it is part of the ingestion fingerprint.
+     */
+    private boolean sortByPosition = true;
 
     public String getResourcesDir() { return resourcesDir; }
     public void setResourcesDir(String resourcesDir) { this.resourcesDir = resourcesDir; }
@@ -39,4 +45,6 @@ public class IngestProperties {
     public void setEmbeddingModel(String embeddingModel) { this.embeddingModel = embeddingModel; }
     public int getPipelineVersion() { return pipelineVersion; }
     public void setPipelineVersion(int pipelineVersion) { this.pipelineVersion = pipelineVersion; }
+    public boolean isSortByPosition() { return sortByPosition; }
+    public void setSortByPosition(boolean sortByPosition) { this.sortByPosition = sortByPosition; }
 }
