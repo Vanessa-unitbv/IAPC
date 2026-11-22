@@ -38,6 +38,8 @@ public final class ChunkMetadata {
     public static final String FETCHED_AT = "fetched_at";
     /** When this version became valid, ISO-8601 (Story 2 versioning). */
     public static final String VALID_FROM = "valid_from";
+    /** When a newer version replaced this one, ISO-8601; absent on the latest version (Story 2 versioning). */
+    public static final String VALID_TO = "valid_to";
 
     // ---- ingestion bookkeeping ----
 

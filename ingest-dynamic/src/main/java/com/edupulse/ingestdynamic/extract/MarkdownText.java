@@ -16,7 +16,19 @@ public final class MarkdownText {
     private static final Pattern EMPTY_LINK = Pattern.compile("\\[[ \\t]{0,10}\\]\\([^()\\n]{0,2000}\\)");
     private static final Pattern LINK = Pattern.compile("\\[([^\\[\\]\\n]{1,500})\\]\\([^()\\n]{0,2000}\\)");
     private static final Pattern REFERENCE_DEFINITION = Pattern.compile("(?m)^ {0,3}\\[[^\\[\\]\\n]{1,500}\\]:[ \\t]{0,10}\\S.*$");
-    private static final Pattern HTML_TAG = Pattern.compile("</?[A-Za-z][^<>\\n]{0,500}>");
+    /**
+     * Only real HTML elements are removed, so placeholders and generics such as {@code <module>},
+     * {@code <your-token>} or {@code List<String>} stay in the text.
+     */
+    private static final Pattern HTML_TAG = Pattern.compile("(?i)</?(?:"
+            + "a|abbr|article|aside|audio|b|bdi|bdo|big|blockquote|body|br|button|center|cite|code|col|colgroup|dd|del"
+            + "|details|dfn|div|dl|dt|em|embed|figcaption|figure|font|footer|form|h[1-6]|head|header|hr|html|i|iframe"
+            + "|img|input|ins|kbd|label|li|link|main|mark|meta|nav|noscript|ol|p|picture|pre|q|rp|rt|ruby|s|samp"
+            + "|section|small|source|span|strike|strong|sub|summary|sup|svg|table|tbody|td|tfoot|th|thead|time|tr|tt"
+            + "|u|ul|var|video|wbr)(?:[ \\t/][^<>\\n]{0,500})?>");
+    private static final Pattern LINE_BREAK = Pattern.compile("(?i)<br[ \\t]{0,10}/?>");
+    /** {@code <https://example.com>} is a link whose text is the URL itself: keep the URL. */
+    private static final Pattern AUTOLINK = Pattern.compile("<((?:https?|ftp|mailto):[^<>\\s]{1,2000})>");
     private static final Pattern HEADING_MARK = Pattern.compile("(?m)^ {0,3}#{1,6}[ \\t]+");
     private static final Pattern CODE_FENCE = Pattern.compile("(?m)^ {0,3}(?:```|~~~).*$");
     private static final Pattern TABLE_RULE = Pattern.compile(
@@ -39,7 +51,9 @@ public final class MarkdownText {
         t = EMPTY_LINK.matcher(t).replaceAll("");
         t = LINK.matcher(t).replaceAll("$1");
         t = REFERENCE_DEFINITION.matcher(t).replaceAll("");
+        t = LINE_BREAK.matcher(t).replaceAll("\n");
         t = HTML_TAG.matcher(t).replaceAll("");
+        t = AUTOLINK.matcher(t).replaceAll("$1");
         t = CODE_FENCE.matcher(t).replaceAll("");
         t = TABLE_RULE.matcher(t).replaceAll("");
         t = HEADING_MARK.matcher(t).replaceAll("");

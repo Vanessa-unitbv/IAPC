@@ -35,7 +35,7 @@ public class DynamicIngestProperties {
     private String embeddingModel = "text-embedding-3-small";
 
     /** Bump when the extraction or splitting logic changes, to force re-ingestion of unchanged sources. */
-    private int pipelineVersion = 2;
+    private int pipelineVersion = 3;
 
     /** Sources ingested by POST /ingest/dynamic/run when the request has no body. */
     private List<SourceSpec> sources = new ArrayList<>();

@@ -71,7 +71,8 @@ Add a key there before using it in any service.
 | `chunk_index`, `total_chunks` | Position of the chunk in its document version (0-based) and chunk count |
 | `page`, `page_end` | First and last page of the chunk (1-based) |
 | `source`, `source_type` | Name shown in citations; `static` or `dynamic` |
-| `source_url`, `fetched_at`, `valid_from` | Story 2: origin URL, fetch time, start of validity of the version |
+| `source_url`, `fetched_at`, `title` | Story 2: origin URL, fetch time, page title (when there is one) |
+| `valid_from`, `valid_to` | Story 2: when the version became valid, and when a newer version replaced it (absent on the latest) |
 | `checksum`, `ingest_fingerprint` | SHA-256 of the content; checksum plus settings, used to skip unchanged files |
 | `embedding_model`, `chunk_size`, `chunk_overlap`, `ingested_at` | How and when the chunk was produced |
 
@@ -88,6 +89,8 @@ Add a key there before using it in any service.
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/ingest/dynamic/run` | Ingest the sources in the JSON body, or the configured `app.ingest.sources` when there is no body |
+| GET | `/ingest/dynamic/search?q=...&k=5` | Semantic search over the latest version of every document |
+| GET | `/ingest/dynamic/search?q=...&doc_id=...&version=1` | The same search over one specific (older) version |
 | GET | `/ingest/dynamic/status` | Service status, allowed domains and number of configured sources |
 
 A source is either a URL (web page, PDF, text or Markdown file) or a GitHub repository's documentation files:
@@ -100,8 +103,9 @@ curl -X POST http://localhost:8080/ingest-dynamic/ingest/dynamic/run -H "Content
 ]'
 ```
 
-The response lists the sources that were ingested, updated, skipped as unchanged, and the ones that failed with
-the reason; a failed source never stops the rest of the batch. Every chunk stores `source_url`, `fetched_at`,
+The response lists the sources that were ingested for the first time (`ingested`), stored as a new version
+(`newVersions`), re-indexed (`reindexed`), skipped as unchanged (`unchanged`), and the ones that failed with the
+reason (`failed`); a failed source never stops the rest of the batch. Every chunk stores `source_url`, `fetched_at`,
 `valid_from` and, for web pages, `title` (see the metadata contract above). `doc_id` is the source URL; for
 repository files it is the file's GitHub page.
 
@@ -114,8 +118,18 @@ What happens to a source:
 2. **Extract**: web pages lose navigation, headers, footers, sidebars, cookie banners, scripts and forms
    (`HtmlTextExtractor`); Markdown loses badges, images, link targets and HTML (`MarkdownText`); PDFs use the same
    extractor as Story 1.
-3. **Split and store**: the same structure-aware splitter as Story 1. An unchanged source (same checksum and
-   settings) is skipped; a changed one is replaced atomically. Versioning (keeping old versions) is Story 2, Task 2.
+3. **Split and store**: the same structure-aware splitter as Story 1, then versioning (Task 2):
+   - new source: stored as version 1;
+   - same content and settings: skipped;
+   - **content changed**: stored as version N+1 with `is_latest=true` and `valid_from` = fetch time; the previous
+     version stays in the store with `is_latest=false` and `valid_to` = the same time;
+   - same content, settings changed (chunking, embedding model, pipeline version): the latest version is re-indexed
+     in place, without a new version number.
+
+   Both writes are atomic under a per-document lock, so a query never sees two latest versions or none.
+
+Queries see only latest versions unless they ask for one: the rule is `VersionSelector` in `rag-common`
+(`latest()` by default, `version(docId, n)` on request), so retrieval in Story 3 applies the same default.
 
 `ingest-dynamic` writes to the `vector_store` table created by `ingest-static`, so start `ingest-static` first.
 
