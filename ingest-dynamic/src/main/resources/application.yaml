@@ -1,5 +1,5 @@
-# Story 2: dynamic ingestion (Internet sources, versioning, watcher, webhooks)
-# Skeleton: health check and Eureka registration only. Port 8080 in Docker (SERVER_PORT), 8082 when run locally.
+# Story 2: dynamic ingestion (Internet sources, versioning, watcher, webhooks).
+# Variable names match .env.example and docker-compose.yml. Port 8080 in Docker (SERVER_PORT), 8082 when run locally.
 server:
   port: 8082
 
@@ -8,13 +8,47 @@ spring:
     import: optional:file:.env[.properties],optional:file:../.env[.properties]
   application:
     name: ingest-dynamic
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ragdb}
+    username: ${POSTGRES_USER}
+    password: ${POSTGRES_PASSWORD}
+  ai:
+    openai:
+      api-key: ${LLM_API_KEY}
+      # Spring AI 2 uses the official OpenAI SDK: the base URL must include /v1 (otherwise every call is a 404).
+      base-url: ${LLM_BASE_URL:https://api.openai.com/v1}
+      embedding:
+        options:
+          model: ${EMBEDDING_MODEL:text-embedding-3-small}
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: ${EMBEDDING_DIMENSIONS:1536}
+        # The vector_store table is created by ingest-static; start it first.
+        initialize-schema: false
 
 app:
   ingest:
     resources-dir: ${INGEST_RESOURCES_DIR:./resources}
-    # Task 4 (security): domains that may be fetched, comma-separated. Empty means nothing is allowed.
+    # Only these domains (and their subdomains) may be fetched, comma-separated. Empty means nothing is allowed.
     allowed-domains: ${INGEST_ALLOWED_DOMAINS:}
     max-size-mb: ${INGEST_MAX_SIZE_MB:20}
+    timeout-seconds: ${INGEST_TIMEOUT_SECONDS:20}
+    max-redirects: 3
+    chunk-size: ${CHUNK_SIZE:800}
+    chunk-overlap: ${CHUNK_OVERLAP:100}
+    # Follows the model Spring AI actually uses, so a model change forces re-ingestion.
+    embedding-model: ${spring.ai.openai.embedding.options.model:text-embedding-3-small}
+    # Ingested by POST /ingest/dynamic/run when the request has no body (Task 1 demo set):
+    # a web page, a remote PDF and a third-party repository's docs.
+    sources:
+      - url: https://en.wikipedia.org/wiki/Deposit_insurance
+      - url: https://www.brd.ro/_files/pdf/Formular_pentru_informatii_oferite_deponentilor.pdf
+      - repo: pgvector/pgvector
+        ref: master
+        paths:
+          - README.md
   webhook:
     # Task 3: HMAC secret shared with the vendor. Webhooks must be rejected while it is empty.
     secret: ${VENDOR_WEBHOOK_SECRET:}

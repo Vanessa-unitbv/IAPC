@@ -17,7 +17,7 @@ Epic 1 (RAG) is due on **December 7**.
 | `retrieval-pre` | Story 3: metadata filters, query normalization | 8083 | T1, T2 (Vanessa) |
 | `retrieval-post` | Story 4: reranking, neighbor stitching | 8084 | T1, T2 (Valentina) |
 
-`ingest-dynamic`, `retrieval-pre` and `retrieval-post` are skeletons for now (health check and Eureka registration only).
+`retrieval-pre` and `retrieval-post` are skeletons for now (health check and Eureka registration only).
 
 In Docker every service listens on 8080 inside its container and is reached through the gateway:
 `http://localhost:8080/<module>/...`, for example `POST http://localhost:8080/ingest-static/ingest/static/run`.
@@ -52,7 +52,7 @@ Always build from the repository root (the modules depend on `rag-common`):
 ```
 
 Unit tests need no infrastructure. Tests that start the full context against PostgreSQL and the LLM API are
-skipped unless `RUN_INTEGRATION_TESTS=true` is set.
+skipped unless `RUN_INTEGRATION_TESTS=true` is set. GitHub Actions runs `mvn verify` on every pull request.
 
 ## Configuration
 
@@ -83,11 +83,47 @@ Add a key there before using it in any service.
 | GET | `/ingest/static/sample?n=20` | Random chunks with quality flags, for the manual check |
 | GET | `/ingest/static/status` | Service status |
 
+## Story 2 endpoints (`ingest-dynamic`)
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/ingest/dynamic/run` | Ingest the sources in the JSON body, or the configured `app.ingest.sources` when there is no body |
+| GET | `/ingest/dynamic/status` | Service status, allowed domains and number of configured sources |
+
+A source is either a URL (web page, PDF, text or Markdown file) or a GitHub repository's documentation files:
+
+```bash
+curl -X POST http://localhost:8080/ingest-dynamic/ingest/dynamic/run -H "Content-Type: application/json" -d '[
+  {"url": "https://en.wikipedia.org/wiki/Deposit_insurance"},
+  {"url": "https://www.brd.ro/_files/pdf/Formular_pentru_informatii_oferite_deponentilor.pdf"},
+  {"repo": "pgvector/pgvector", "ref": "master", "paths": ["README.md"]}
+]'
+```
+
+The response lists the sources that were ingested, updated, skipped as unchanged, and the ones that failed with
+the reason; a failed source never stops the rest of the batch. Every chunk stores `source_url`, `fetched_at`,
+`valid_from` and, for web pages, `title` (see the metadata contract above). `doc_id` is the source URL; for
+repository files it is the file's GitHub page.
+
+What happens to a source:
+
+1. **Fetch** (`SafeHttpFetcher`): HTTPS only, the host must be on `INGEST_ALLOWED_DOMAINS` and must not resolve to
+   a loopback, private, link-local or metadata address. Redirects (at most 3) are checked the same way. Requests time
+   out after `INGEST_TIMEOUT_SECONDS`; bodies over `INGEST_MAX_SIZE_MB` and content types other than HTML, PDF,
+   plain text and Markdown are rejected.
+2. **Extract**: web pages lose navigation, headers, footers, sidebars, cookie banners, scripts and forms
+   (`HtmlTextExtractor`); Markdown loses badges, images, link targets and HTML (`MarkdownText`); PDFs use the same
+   extractor as Story 1.
+3. **Split and store**: the same structure-aware splitter as Story 1. An unchanged source (same checksum and
+   settings) is skipped; a changed one is replaced atomically. Versioning (keeping old versions) is Story 2, Task 2.
+
+`ingest-dynamic` writes to the `vector_store` table created by `ingest-static`, so start `ingest-static` first.
+
 ## How we work
 
 1. One branch per task, e.g. `s2-t1-internet-ingestion`. No direct pushes to `main`.
-2. Open a pull request that meets the definition of done of the task.
-3. The other team member reviews; merge only when `./mvnw verify` passes.
+2. Open a pull request; the PR template contains the definition of done.
+3. The other team member reviews; merge only when CI is green.
 
 ## Known issues
 
