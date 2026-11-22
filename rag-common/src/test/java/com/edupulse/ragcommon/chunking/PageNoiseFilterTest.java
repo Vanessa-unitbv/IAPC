@@ -39,12 +39,18 @@ class PageNoiseFilterTest {
         List<PageText> pages = List.of(
                 new PageText(1, "12\nIntroduction to the fee schedule"),
                 new PageText(2, "Page 3\nConditions for card payments"),
-                new PageText(3, "Exchange rates apply\n3 / 40"));
+                new PageText(3, "Exchange rates apply\n3 / 40"),
+                new PageText(4, "Terms and conditions\n— 8 —"),
+                new PageText(5, "Rates\n– 12 –"),
+                new PageText(6, "Fees\n- 9 -"));
         PageNoiseFilter.Result result = PageNoiseFilter.apply(pages);
-        assertEquals(3, result.removedLines());
+        assertEquals(6, result.removedLines());
         assertEquals("Introduction to the fee schedule", result.pages().get(0).text());
         assertEquals("Conditions for card payments", result.pages().get(1).text());
         assertEquals("Exchange rates apply", result.pages().get(2).text());
+        assertEquals("Terms and conditions", result.pages().get(3).text());
+        assertEquals("Rates", result.pages().get(4).text());
+        assertEquals("Fees", result.pages().get(5).text());
     }
 
     // ---- failure / edge paths: content must never be removed by mistake ----

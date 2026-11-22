@@ -24,6 +24,11 @@ class TextCleanerTest {
     }
 
     @Test
+    void controlCharacterWithUnknownMeaningIsRemoved() {
+        assertEquals("Oce", TextCleaner.clean("O\u0019ce"));
+    }
+
+    @Test
     void lineEndingHyphenBeforeUppercaseIsNotJoined() {
         assertEquals("Section One-\nNext heading", TextCleaner.clean("Section One-\nNext heading"));
     }
@@ -55,8 +60,13 @@ class TextCleanerTest {
     }
 
     @Test
-    void wideGapsInTableRowsBecomeColumnSeparators() {
-        assertEquals("Comision | 0,5% | 10", TextCleaner.clean("Comision   0,5%    10"));
+    void wideGapsAreCollapsedToSingleSpaces() {
+        assertEquals("Comision 0,5% 10", TextCleaner.clean("Comision   0,5%    10"));
+    }
+
+    @Test
+    void separatesConcatenatedUppercaseHeadingFromTitleCaseWord() {
+        assertEquals("POLICY Effective", TextCleaner.clean("POLICYEffective"));
     }
 
     @Test

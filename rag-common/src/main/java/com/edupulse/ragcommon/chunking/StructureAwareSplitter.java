@@ -8,10 +8,13 @@ import java.util.regex.Pattern;
  * Structure-aware, token-based splitter with real overlap.
  *
  * <p>Text is cut into small atomic segments following the document structure
- * (paragraph -> line -> sentence -> word). A paragraph or table that fits in one chunk stays
- * a single segment, so tables are not torn apart unless they exceed the chunk size.
+ * (paragraph -> line -> sentence -> word). A segment is never larger than {@code maxSegment} tokens
+ * ({@code overlap} when overlap is enabled, otherwise {@code chunkSize}): a block bigger than that is split
+ * further. This guarantees that the overlap tail always has at least one whole segment to repeat; with larger
+ * atomic paragraphs the tail came out empty and some chunk boundaries had no overlap at all.
  * Segments are packed into chunks of at most {@code chunkSize} tokens, and the last segments of
  * each chunk (up to {@code overlap} tokens) are repeated at the start of the next one.
+ * Text is rebuilt with the original separators, so a split paragraph still reads the same inside a chunk.
  * Chunks may span pages; each one records page_start and page_end.
  */
 public class StructureAwareSplitter {
@@ -35,6 +38,8 @@ public class StructureAwareSplitter {
     private final TokenCounter counter;
     private final int chunkSize;
     private final int overlap;
+    /** Largest atomic segment, in tokens. */
+    private final int maxSegment;
 
     public StructureAwareSplitter(TokenCounter counter, int chunkSize, int overlap) {
         if (chunkSize <= 0) {
@@ -46,6 +51,7 @@ public class StructureAwareSplitter {
         this.counter = counter;
         this.chunkSize = chunkSize;
         this.overlap = overlap;
+        this.maxSegment = overlap > 0 ? overlap : chunkSize;
     }
 
     public List<Chunk> split(List<PageText> pages) {
@@ -67,7 +73,7 @@ public class StructureAwareSplitter {
 
     private void addAtomic(String block, String sep, int page, List<Segment> out) {
         int tokens = counter.count(block);
-        if (tokens <= chunkSize) {
+        if (tokens <= maxSegment) {
             out.add(new Segment(block, sep, page, tokens));
             return;
         }
@@ -107,7 +113,7 @@ public class StructureAwareSplitter {
     }
 
     private void hardCut(String text, String sep, int page, List<Segment> out) {
-        int step = Math.max(1, text.length() * chunkSize / Math.max(1, counter.count(text)) - 1);
+        int step = Math.max(1, text.length() * maxSegment / Math.max(1, counter.count(text)) - 1);
         boolean first = true;
         for (int i = 0; i < text.length(); i += step) {
             String piece = text.substring(i, Math.min(text.length(), i + step));

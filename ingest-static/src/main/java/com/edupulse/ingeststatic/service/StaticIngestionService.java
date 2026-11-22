@@ -27,23 +27,28 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 @Service
 public class StaticIngestionService {
 
     private static final Logger log = LoggerFactory.getLogger(StaticIngestionService.class);
+    private static final Pattern LONG_WORD = Pattern.compile("\\p{L}{25,}");
+    private static final Pattern URL_OR_EMAIL = Pattern.compile(
+            "(?i)^(?:https?://\\S+|www\\.\\S+|[\\p{L}0-9._%+-]+@[\\p{L}0-9.-]+\\.[a-z]{2,}|(?:[\\p{L}0-9-]+\\.)+[a-z]{2,})$");
 
     private final ChunkWriter chunkWriter;
     private final JdbcTemplate jdbcTemplate;
     private final IngestProperties props;
-    private final PdfTextExtractor extractor = new PdfTextExtractor();
+    private final PdfTextExtractor extractor;
     private final JTokkitTokenCounter tokenCounter = new JTokkitTokenCounter();
 
     public StaticIngestionService(ChunkWriter chunkWriter, JdbcTemplate jdbcTemplate, IngestProperties props) {
         this.chunkWriter = chunkWriter;
         this.jdbcTemplate = jdbcTemplate;
         this.props = props;
+        this.extractor = new PdfTextExtractor(props.isSortByPosition());
     }
 
     /** Ingests every PDF in the resources folder. A failing file is reported and does not stop the batch. */
@@ -87,6 +92,8 @@ public class StaticIngestionService {
         summary.put("embedding_model", props.getEmbeddingModel());
         summary.put("chunk_size_tokens", props.getChunkSize());
         summary.put("chunk_overlap_tokens", props.getChunkOverlap());
+        summary.put("pipeline_version", props.getPipelineVersion());
+        summary.put("sort_by_position", props.isSortByPosition());
         summary.put("ingested_new", ingested);
         summary.put("updated", updated);
         summary.put("skipped_unchanged", skipped);
@@ -146,7 +153,8 @@ public class StaticIngestionService {
     /** File checksum combined with everything that changes the produced chunks or embeddings. */
     private String fingerprint(String checksum) {
         String input = checksum + "|" + props.getChunkSize() + "|" + props.getChunkOverlap()
-                + "|" + props.getEmbeddingModel() + "|" + props.getPipelineVersion();
+                + "|" + props.getEmbeddingModel() + "|" + props.getPipelineVersion()
+                + "|" + props.isSortByPosition();
         return sha256(input.getBytes(StandardCharsets.UTF_8));
     }
 
@@ -162,13 +170,23 @@ public class StaticIngestionService {
                     if (TextCleaner.hasControlChars(content)) flags.add("CONTROL_CHAR");
                     if (TextCleaner.looksMojibake(content)) flags.add("MOJIBAKE");
                     if (content.length() < 40) flags.add("VERY_SHORT");
-                    if (content.matches("(?s).*\\p{L}{25,}.*")) flags.add("VERY_LONG_WORD");
+                    if (hasVeryLongWord(content)) flags.add("VERY_LONG_WORD");
                     Map<String, Object> row = new LinkedHashMap<>();
                     row.put("metadata", rs.getString("metadata"));
                     row.put("flags", flags);
                     row.put("content", content);
                     return row;
                 }, limit);
+    }
+
+    static boolean hasVeryLongWord(String content) {
+        for (String token : content.split("\\s+")) {
+            String candidate = token.replaceAll("^[\\p{P}]+|[\\p{P}]+$", "");
+            if (!URL_OR_EMAIL.matcher(candidate).matches() && LONG_WORD.matcher(candidate).find()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String sha256(Path file) {

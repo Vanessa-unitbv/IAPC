@@ -51,8 +51,9 @@ Always build from the repository root (the modules depend on `rag-common`):
 ./mvnw -pl ingest-static -am verify    # one module and what it depends on
 ```
 
-Unit tests need no infrastructure. Tests that start the full context against PostgreSQL and the LLM API are
-skipped unless `RUN_INTEGRATION_TESTS=true` is set. GitHub Actions runs `mvn verify` on every pull request.
+Unit tests need no infrastructure. Context-based integration tests are skipped unless `RUN_INTEGRATION_TESTS=true`
+is set. `ChunkWriterUpdateIntegrationTest` requires PostgreSQL, stubs vector-store writes, and makes no LLM API calls.
+GitHub Actions runs `mvn verify` on every pull request.
 
 ## Configuration
 
@@ -139,9 +140,4 @@ Queries see only latest versions unless they ask for one: the rule is `VersionSe
 2. Open a pull request; the PR template contains the definition of done.
 3. The other team member reviews; merge only when CI is green.
 
-## Known issues
 
-- `resources/paypal_consumer_fees_2026.pdf` is a scanned PDF with no text layer, so ingestion reports it as
-  failed (OCR is not supported).
-- `resources/raiffeisen_sme_fees_2024.pdf` is 61 MB, close to GitHub's 100 MB limit. Do not add larger files;
-  compress them first.
