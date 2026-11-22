@@ -1,0 +1,21 @@
+# Keep the build context small and free of secrets.
+.git
+.gitignore
+.idea/
+.vscode/
+*.iml
+**/target/
+**/*.log
+
+# Secrets and local runtime data
+.env
+.env.*
+!.env.example
+resources/
+
+# Not needed inside the image build
+docker-compose*.yml
+init-db/
+Dockerfile
+.dockerignore
+*.md
