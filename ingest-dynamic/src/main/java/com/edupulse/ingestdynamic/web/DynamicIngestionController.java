@@ -1,13 +1,16 @@
 package com.edupulse.ingestdynamic.web;
 
 import com.edupulse.ingestdynamic.config.DynamicIngestProperties;
+import com.edupulse.ingestdynamic.ingest.ChunkHit;
 import com.edupulse.ingestdynamic.ingest.DynamicIngestionService;
 import com.edupulse.ingestdynamic.ingest.IngestionReport;
 import com.edupulse.ingestdynamic.ingest.SourceSpec;
+import com.edupulse.ragcommon.ChunkMetadata;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.LinkedHashMap;
@@ -42,6 +45,33 @@ public class DynamicIngestionController {
                             + "or configure app.ingest.sources");
         }
         return ingestionService.ingest(toIngest);
+    }
+
+    /**
+     * Searches the stored chunks: by default only the latest version of each document; with {@code version}
+     * (and optionally {@code doc_id}) exactly that version. Example:
+     * {@code /ingest/dynamic/search?q=deposit+guarantee&doc_id=https://...&version=1}
+     */
+    @GetMapping("/search")
+    public List<Map<String, Object>> search(@RequestParam("q") String query,
+                                            @RequestParam(value = "k", defaultValue = "5") int topK,
+                                            @RequestParam(value = "doc_id", required = false) String docId,
+                                            @RequestParam(value = "version", required = false) Integer version) {
+        return ingestionService.search(query, topK, docId, version).stream().map(DynamicIngestionController::toJson).toList();
+    }
+
+    private static Map<String, Object> toJson(ChunkHit hit) {
+        Map<String, Object> md = hit.metadata();
+        Map<String, Object> json = new LinkedHashMap<>();
+        json.put("doc_id", md.get(ChunkMetadata.DOC_ID));
+        json.put("version", md.get(ChunkMetadata.VERSION));
+        json.put("is_latest", md.get(ChunkMetadata.IS_LATEST));
+        json.put("valid_from", md.get(ChunkMetadata.VALID_FROM));
+        json.put("valid_to", md.get(ChunkMetadata.VALID_TO));
+        json.put("chunk_index", md.get(ChunkMetadata.CHUNK_INDEX));
+        json.put("score", hit.score());
+        json.put("text", hit.text());
+        return json;
     }
 
     @GetMapping("/status")
