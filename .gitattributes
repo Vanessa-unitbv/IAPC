@@ -1,0 +1,13 @@
+# Store text files with LF in the repository, whatever the OS of the person committing.
+* text=auto
+
+# Scripts that must keep a specific line ending
+mvnw text eol=lf
+*.sh text eol=lf
+*.cmd text eol=crlf
+
+# Binary files
+*.pdf binary
+*.jar binary
+*.png binary
+*.jpg binary

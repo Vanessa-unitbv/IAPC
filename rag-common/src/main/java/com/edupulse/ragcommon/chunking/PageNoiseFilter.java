@@ -1,4 +1,4 @@
-package com.edupulse.ingeststatic.chunking;
+package com.edupulse.ragcommon.chunking;
 
 import java.util.ArrayList;
 import java.util.HashMap;
