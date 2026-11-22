@@ -57,6 +57,35 @@ class MarkdownTextTest {
     }
 
     @Test
+    void keepsPlaceholdersGenericsAndAutolinks() {
+        String text = MarkdownText.toPlainText("""
+                Call `http://localhost:8080/<module>/run` with <your-token>.
+                It returns a `List<String>` or a `Map<K, V>`.
+                Docs: <https://example.com/docs>.
+                """);
+        assertTrue(text.contains("http://localhost:8080/<module>/run with <your-token>."), text);
+        assertTrue(text.contains("List<String> or a Map<K, V>."), text);
+        assertTrue(text.contains("Docs: https://example.com/docs."), text);
+    }
+
+    @Test
+    void removesHtmlElementsWithAttributesAndSelfClosingTags() {
+        String text = MarkdownText.toPlainText("""
+                <details><summary>Show more</summary>
+                Line one<br/>line two <img src="logo.png" alt="logo" />
+                <DIV class="x">Upper case</DIV>
+                </details>
+                """);
+        assertTrue(text.contains("Show more"), text);
+        assertTrue(text.contains("Line one\nline two"), text);
+        assertTrue(text.contains("Upper case"), text);
+        for (String noise : new String[] {"<details", "<summary", "</summary", "<br", "<img", "logo.png", "<DIV",
+                "</DIV", "</details"}) {
+            assertFalse(text.contains(noise), "should be removed: " + noise + "\n" + text);
+        }
+    }
+
+    @Test
     void nullBecomesEmpty() {
         assertEquals("", MarkdownText.toPlainText(null));
     }
